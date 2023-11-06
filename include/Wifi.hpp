@@ -3,27 +3,36 @@
 #include <WString.h>
 #include <WiFi.h>
 
-class Wifi {
+class Wifi_Handler {
     public:
     
-        Wifi(String ssid, String password, wifi_mode_t wifi_mode){
+        Wifi_Handler(String ssid, String password, wifi_mode_t wifi_mode){
             WiFi.mode(wifi_mode);
             this->ssid = ssid;
             this->password = password;
         }
     
-        void connect(int max_tries = 5){
-            for(int i = 1; i <= max_tries; i++){
-                Serial.println("Connecting To Wifi " + this->ssid + " (try number " + i + ")");
-                WiFi.begin(this->ssid, this->password);
-                switch (WiFi.status()){
-                    case wl_status_t::WL_CONNECTED:
-                        Serial.println("WiFi connected");
-                        break;
-                    default:
-                        Serial.println("WiFi connection failed, retrying");
-                }
+        bool connect(int waitSecond = 10){
+            Serial.print("Connecting to Wifi " + this->ssid);
+            WiFi.begin(this->ssid, this->password);
+
+            waitSecond *= 1000;
+
+            while(WiFi.status() != WL_CONNECTED && waitSecond > 0){
+                Serial.print(".");
+                delay(100);
+                waitSecond -= 100;
             }
+
+            Serial.print("\n");
+
+            if(waitSecond <= 0){
+                Serial.println("Fail to connect to " + this->ssid);
+                return false;
+            }
+
+            Serial.println("Connected to " + this->ssid);
+            return true;
         }
 
     private:
