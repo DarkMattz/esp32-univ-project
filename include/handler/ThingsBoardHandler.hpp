@@ -1,11 +1,8 @@
+#pragma once
 #include <Arduino.h>
 #include <Update.h>
-#if defined(ESP8266)
-#include <ESP8266WiFi.h>
-#define THINGSBOARD_ENABLE_PROGMEM 0
-#elif defined(ESP32) || defined(RASPBERRYPI_PICO) || defined(RASPBERRYPI_PICO_W)
 #include <WiFi.h>
-#endif
+#include "model/SensorModel.hpp"
 
 #ifndef LED_BUILTIN
 #define LED_BUILTIN 99
@@ -14,8 +11,7 @@
 #include <Arduino_MQTT_Client.h>
 #include <ThingsBoard.h>
 
-constexpr char WIFI_SSID[] = "Ade";
-constexpr char WIFI_PASSWORD[] = "Ade1234567890";
+bool setAlarm = false;
 
 // See https://thingsboard.io/docs/getting-started-guides/helloworld/
 // to understand how to obtain an access token
@@ -78,35 +74,6 @@ constexpr std::array<const char *, 2U> SHARED_ATTRIBUTES_LIST = {
 constexpr std::array<const char *, 1U> CLIENT_ATTRIBUTES_LIST = {
   LED_MODE_ATTR
 };
-
-/// @brief Initalizes WiFi connection,
-// will endlessly delay until a connection has been successfully established
-void InitWiFi() {
-  Serial.println("Connecting to AP ...");
-  // Attempting to establish a connection to the given WiFi network
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    // Delay 500ms until a connection has been succesfully established
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("Connected to AP");
-}
-
-/// @brief Reconnects the WiFi uses InitWiFi if the connection has been removed
-/// @return Returns true as soon as a connection has been established again
-const bool reconnect() {
-  // Check to ensure we aren't connected yet
-  const wl_status_t status = WiFi.status();
-  if (status == WL_CONNECTED) {
-    return true;
-  }
-
-  // If we aren't establish a new connection to the given WiFi network
-  InitWiFi();
-  return true;
-}
-
 
 /// @brief Processes function for RPC call "setLedMode"
 /// RPC_Data is a JSON variant, that can be queried using operator[]
@@ -180,22 +147,7 @@ const Shared_Attribute_Callback attributes_callback(&processSharedAttributes, SH
 const Attribute_Request_Callback attribute_shared_request_callback(&processSharedAttributes, SHARED_ATTRIBUTES_LIST.cbegin(), SHARED_ATTRIBUTES_LIST.cend());
 const Attribute_Request_Callback attribute_client_request_callback(&processClientAttributes, CLIENT_ATTRIBUTES_LIST.cbegin(), CLIENT_ATTRIBUTES_LIST.cend());
 
-void setup() {
-  // Initalize serial connection for debugging
-  Serial.begin(SERIAL_DEBUG_BAUD);
-  if (LED_BUILTIN != 99) {
-    pinMode(LED_BUILTIN, OUTPUT);
-  }
-  delay(1000);
-  InitWiFi();
-}
-
-void loop() {
-  delay(10);
-
-  if (!reconnect()) {
-    return;
-  }
+void thingsboard_do(SensorModel *model) {
 
   if (!tb.connected()) {
     // Connect to the ThingsBoard
@@ -266,12 +218,14 @@ void loop() {
   // Sending telemetry every telemetrySendInterval time
   if (millis() - previousDataSend > telemetrySendInterval) {
     previousDataSend = millis();
-    tb.sendTelemetryData("temperature", random(10, 20));
+    tb.sendAttributeData("alarmStatus", model->getAlarmStatus());
+    tb.sendAttributeData("setAlarm", setAlarm);
     tb.sendAttributeData("rssi", WiFi.RSSI());
     tb.sendAttributeData("channel", WiFi.channel());
     tb.sendAttributeData("bssid", WiFi.BSSIDstr().c_str());
     tb.sendAttributeData("localIp", WiFi.localIP().toString().c_str());
     tb.sendAttributeData("ssid", WiFi.SSID().c_str());
+    setAlarm = model->getAlarmStatus();
   }
 
   tb.loop();

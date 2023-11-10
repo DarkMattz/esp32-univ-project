@@ -3,10 +3,10 @@
 #include <WString.h>
 #include <WiFi.h>
 
-class Wifi_Handler {
+class WifiHandler {
     public:
     
-        Wifi_Handler(String ssid, String password, wifi_mode_t wifi_mode){
+        WifiHandler(String ssid, String password, wifi_mode_t wifi_mode){
             WiFi.mode(wifi_mode);
             this->ssid = ssid;
             this->password = password;
@@ -33,6 +33,12 @@ class Wifi_Handler {
 
             Serial.println("Connected to " + this->ssid);
             return true;
+        }
+
+        void checkAndReconnect() {
+            if(WiFi.status() != WL_CONNECTED) {
+                connect();
+            }
         }
 
     private:
