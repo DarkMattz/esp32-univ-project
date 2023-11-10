@@ -11,7 +11,8 @@
 #include <Arduino_MQTT_Client.h>
 #include <ThingsBoard.h>
 
-bool setAlarm = false;
+// Set to true if thingsboard sent the data
+bool THINGSBOARD_DATA_SENT = false;
 
 // See https://thingsboard.io/docs/getting-started-guides/helloworld/
 // to understand how to obtain an access token
@@ -147,7 +148,7 @@ const Shared_Attribute_Callback attributes_callback(&processSharedAttributes, SH
 const Attribute_Request_Callback attribute_shared_request_callback(&processSharedAttributes, SHARED_ATTRIBUTES_LIST.cbegin(), SHARED_ATTRIBUTES_LIST.cend());
 const Attribute_Request_Callback attribute_client_request_callback(&processClientAttributes, CLIENT_ATTRIBUTES_LIST.cbegin(), CLIENT_ATTRIBUTES_LIST.cend());
 
-void thingsboard_do(SensorModel *model) {
+void thingsboard_handle(SensorModel *model) {
 
   if (!tb.connected()) {
     // Connect to the ThingsBoard
@@ -218,14 +219,16 @@ void thingsboard_do(SensorModel *model) {
   // Sending telemetry every telemetrySendInterval time
   if (millis() - previousDataSend > telemetrySendInterval) {
     previousDataSend = millis();
-    tb.sendAttributeData("alarmStatus", model->getAlarmStatus());
-    tb.sendAttributeData("setAlarm", setAlarm);
+    tb.sendAttributeData("alarmStatus", model->isAlarmStatus());
+    tb.sendAttributeData("setAlarm", model->isLimiter());
     tb.sendAttributeData("rssi", WiFi.RSSI());
     tb.sendAttributeData("channel", WiFi.channel());
     tb.sendAttributeData("bssid", WiFi.BSSIDstr().c_str());
     tb.sendAttributeData("localIp", WiFi.localIP().toString().c_str());
     tb.sendAttributeData("ssid", WiFi.SSID().c_str());
-    setAlarm = model->getAlarmStatus();
+    THINGSBOARD_DATA_SENT = true;
+  } else {
+    THINGSBOARD_DATA_SENT = false;
   }
 
   tb.loop();

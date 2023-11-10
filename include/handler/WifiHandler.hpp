@@ -5,7 +5,6 @@
 
 class WifiHandler {
     public:
-    
         WifiHandler(String ssid, String password, wifi_mode_t wifi_mode){
             WiFi.mode(wifi_mode);
             this->ssid = ssid;
