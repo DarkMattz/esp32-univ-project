@@ -5,11 +5,18 @@
 #include "handler/WifiHandler.hpp"
 #include "model/SensorModel.hpp"
 
+enum class DoorState{
+    opened, notify, waiting, closing, stuck, closed
+};
+
 #pragma region INIT_FUNCTION
     void init_wifi();
     void init_modules();
     void check_sensor();
     void blynk_send_data();
+    void motor_on();
+    void motor_off();
+    void door_state_change(DoorState state);
 #pragma endregion
 
 #pragma region BLYNK // COME ON BLYNK? WHYY???
@@ -19,11 +26,12 @@
     #include <BlynkSimpleEsp32.h> //ahh damn
 #pragma endregion
 
-
 // Global Variabels Area
 WifiHandler *wifi;
 SensorModel *sensor;
-long long timer;
+DoorState state = DoorState::closed;
+unsigned long timeout = 0;
+unsigned long buzzerTimeout = 0;
 BlynkTimer blynkTimer;
 
 // Default Arduino Function Area
@@ -51,25 +59,78 @@ void init_wifi(){
 }
 
 void init_modules(){
-    timer = -1;
     sensor = new SensorModel();
     sensor->setAlarmStatus(false);
+    sensor->setSoundOn(true);
     pinMode(ApplicationSettings.PIN_SENSOR, INPUT);
     pinMode(ApplicationSettings.PIN_BUZZER, OUTPUT);
+    pinMode(ApplicationSettings.PIN_IA_MOTOR, OUTPUT);
+    pinMode(ApplicationSettings.PIN_IB_MOTOR, OUTPUT);
 }
 
 void check_sensor(){
-    int sensorStatus = digitalRead(ApplicationSettings.PIN_SENSOR);
-    if(timer != -1 && millis() > timer + ApplicationSettings.INTERVAL_MILISECONDS && sensorStatus != HIGH){ // Set alarm if the count reach maximum
-        sensor->setAlarmStatus(true);
-    } else if(timer == -1 && sensorStatus != HIGH) { // Start counting if the sensor not detecting
-        timer = millis();
-        Serial.println("Counting Started!");
-    } else if(sensorStatus == HIGH) { // Reset if the sensor detecting
-        sensor->setAlarmStatus(false);
-        sensor->setLimiter(false);
-        timer = -1;
+    if(!sensor->isSoundOn()){
+        noTone(ApplicationSettings.PIN_BUZZER);
     }
+    int sensorStatus = digitalRead(ApplicationSettings.PIN_SENSOR);
+    
+    if(state != DoorState::closed && sensorStatus == HIGH){
+        door_state_change(DoorState::closed);
+    } else if(state == DoorState::closed && sensorStatus == LOW) {
+        door_state_change(DoorState::opened);
+    } else if(state == DoorState::opened && millis() > timeout){
+        door_state_change(DoorState::notify);
+    } else if(state == DoorState::notify && millis() > timeout){
+        door_state_change(DoorState::closing);
+    } else if(state == DoorState::closing && millis() > timeout){
+        door_state_change(DoorState::stuck);
+    }
+}
+
+void door_state_change(DoorState current_state){
+    switch (current_state){
+        case DoorState::opened:
+            Serial.println("Door Opened!");
+            timeout = millis() + ApplicationSettings.INTERVAL_OPEN_MILISECONDS;
+            break;
+        case DoorState::notify:
+            Serial.println("Notified");
+            tone(ApplicationSettings.PIN_BUZZER, 1000);
+            timeout = millis() + ApplicationSettings.INTERVAL_NOTIFY_MILISECONDS;
+            break;
+        case DoorState::closing:
+            Serial.println("Closing the door!");
+            noTone(ApplicationSettings.PIN_BUZZER);
+            timeout = millis() + ApplicationSettings.INTERVAL_CLOSE_MILISECONDS;
+            motor_on();
+            break;
+        case DoorState::stuck:
+            Serial.println("Door Stuck!");
+            tone(ApplicationSettings.PIN_BUZZER, 1000);
+            sensor->setAlarmStatus(true);
+            motor_off();
+            break;
+        case DoorState::closed:
+            Serial.println("Door Closed!");
+            noTone(ApplicationSettings.PIN_BUZZER);
+            sensor->setAlarmStatus(false);
+            sensor->setLimiter(false);
+            motor_off();
+            break;
+    }
+    state = current_state;
+}
+
+void motor_on(){
+    Serial.println("Motor on");
+    analogWrite(ApplicationSettings.PIN_IA_MOTOR, ApplicationSettings.MOTOR_SPEED);
+    analogWrite(ApplicationSettings.PIN_IB_MOTOR, 0);
+}
+
+void motor_off(){
+    Serial.println("Motor off");
+    analogWrite(ApplicationSettings.PIN_IA_MOTOR, 0);
+    analogWrite(ApplicationSettings.PIN_IB_MOTOR, 0);
 }
 
 BLYNK_WRITE(V1){
