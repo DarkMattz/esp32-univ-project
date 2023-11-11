@@ -3,7 +3,6 @@
 #include <Settings.hpp>
 #include "handler/ThingsBoardHandler.hpp"
 #include "handler/WifiHandler.hpp"
-#include <Callmebot_ESP32.h>
 #include "model/SensorModel.hpp"
 
 #pragma region INIT_FUNCTION
