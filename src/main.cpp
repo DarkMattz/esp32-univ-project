@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <Update.h>
-#include <Settings.hpp>
+#include "Settings.hpp"
 #include "handler/ThingsBoardHandler.hpp"
 #include "handler/WifiHandler.hpp"
 #include "model/SensorModel.hpp"
@@ -9,12 +9,22 @@
     void init_wifi();
     void init_modules();
     void check_sensor();
+    void blynk_send_data();
 #pragma endregion
+
+#pragma region BLYNK // COME ON BLYNK? WHYY???
+    #define BLYNK_TEMPLATE_ID "TMPL6NGShoeNr"
+    #define BLYNK_TEMPLATE_NAME "Door Automation"
+    #define BLYNK_AUTH_TOKEN "4JhP9Cdxelr-SK48UdMnOdVrP7l1Gv3U"
+    #include <BlynkSimpleEsp32.h> //ahh damn
+#pragma endregion
+
 
 // Global Variabels Area
 WifiHandler *wifi;
 SensorModel *sensor;
 long long timer;
+BlynkTimer blynkTimer;
 
 // Default Arduino Function Area
 void setup() {
@@ -22,19 +32,16 @@ void setup() {
     Serial.println("Starting Microcontroller...");
     init_wifi();
     init_modules();
+    Blynk.config(BLYNK_AUTH_TOKEN);
+    blynkTimer.setInterval(telemetrySendInterval, blynk_send_data);
 }
 
 void loop() {
     wifi->checkAndReconnect();
     check_sensor();
     thingsboard_handle(sensor);
-
-    // Send data to whatsapp after sending data to thingsboard
-    if(sensor->isAlarmStatus() && !sensor->isLimiter() && THINGSBOARD_DATA_SENT){
-
-        // Limit data sending
-        sensor->setLimiter(true);
-    }
+    Blynk.run();
+    blynkTimer.run();
 }
 
 // User Defined Function Area
@@ -65,3 +72,11 @@ void check_sensor(){
     }
 }
 
+BLYNK_WRITE(V1){
+    sensor->setSoundOn(param.asInt() == 1);
+}
+
+void blynk_send_data(){
+    Blynk.virtualWrite(V0, sensor->isAlarmStatus());
+    Blynk.virtualWrite(V1, sensor->isSoundOn());
+}

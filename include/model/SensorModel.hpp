@@ -2,6 +2,7 @@
 
 class SensorModel{
 private:
+    bool soundOn;
     bool isAlarmOn;
     bool limiter;
 public:
@@ -16,5 +17,11 @@ public:
     }
     bool isLimiter(){
         return this->limiter;
+    }
+    void setSoundOn(bool soundOn){
+        this->soundOn = soundOn;
+    }
+    bool isSoundOn(){
+        return this->soundOn;
     }
 };

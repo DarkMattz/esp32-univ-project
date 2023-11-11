@@ -226,6 +226,7 @@ void thingsboard_handle(SensorModel *model) {
     tb.sendAttributeData("bssid", WiFi.BSSIDstr().c_str());
     tb.sendAttributeData("localIp", WiFi.localIP().toString().c_str());
     tb.sendAttributeData("ssid", WiFi.SSID().c_str());
+    model->setLimiter(model->isAlarmStatus());
     THINGSBOARD_DATA_SENT = true;
   } else {
     THINGSBOARD_DATA_SENT = false;
